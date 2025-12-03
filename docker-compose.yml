@@ -1,22 +1,63 @@
-version: "3.9"
-
 services:
   backend:
-    image: python:3.12-slim
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: veridia-backend
     working_dir: /code
     volumes:
       - ./backend:/code
-    command: tail -f /dev/null
+      - backend_static:/code/staticfiles
+      - backend_media:/code/media
+    command: python manage.py runserver 0.0.0.0:8000
     ports:
       - "8000:8000"
+    environment:
+      - DEBUG=1
+      - DATABASE_URL=sqlite:///db.sqlite3
+    depends_on:
+      - db
+    networks:
+      - veridia-network
 
   frontend:
-    image: node:20-alpine
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     container_name: veridia-frontend
     working_dir: /app
     volumes:
       - ./frontend:/app
-    command: tail -f /dev/null
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0
     ports:
       - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000/api/v1
+    depends_on:
+      - backend
+    networks:
+      - veridia-network
+
+  db:
+    image: postgres:15-alpine
+    container_name: veridia-db
+    environment:
+      - POSTGRES_DB=veridia
+      - POSTGRES_USER=veridia
+      - POSTGRES_PASSWORD=veridia123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - veridia-network
+
+volumes:
+  postgres_data:
+  backend_static:
+  backend_media:
+
+networks:
+  veridia-network:
+    driver: bridge
