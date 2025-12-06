@@ -16,7 +16,12 @@ services:
       - ./backend/.env
     environment:
       - DEBUG=${DEBUG:-True}
-      - DATABASE_URL=${DATABASE_URL:-postgresql://veridia:veridia123@db:5432/veridia}
+      # If DATABASE_URL is not set or empty, will automatically use SQLite
+      # To use PostgreSQL, set DATABASE_URL in .env file: postgresql://veridia:veridia123@db:5432/veridia
+      - DATABASE_URL=${DATABASE_URL:-}
+    # Database service is optional - only needed if using PostgreSQL
+    # If DATABASE_URL is not set, backend will use SQLite and doesn't need db service
+    # Comment out depends_on if you want to use SQLite without PostgreSQL
     depends_on:
       - db
     networks:

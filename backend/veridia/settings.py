@@ -90,14 +90,29 @@ WSGI_APPLICATION = 'veridia.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# Use PostgreSQL in production, SQLite for local development
-DATABASE_URL = os.environ.get('DATABASE_URL')
+# Use PostgreSQL if configured, fallback to SQLite on error or if not defined
+DATABASE_URL = os.environ.get('DATABASE_URL', '').strip()
+
 if DATABASE_URL:
-    DATABASES = {
-        'default': dj_database_url.parse(DATABASE_URL)
-    }
+    try:
+        # Parse the database URL
+        db_config = dj_database_url.parse(DATABASE_URL)
+        DATABASES = {
+            'default': db_config
+        }
+        # Note: Connection will be tested when Django first accesses the database
+        # If PostgreSQL is unavailable, Django will raise an error that can be caught
+    except Exception as e:
+        # Fallback to SQLite if DATABASE_URL is invalid or parsing fails
+        print(f"Warning: DATABASE_URL parsing failed ({e}), falling back to SQLite")
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
 else:
-    # Default to SQLite for local development
+    # Default to SQLite for local development when DATABASE_URL is not set or empty
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -132,9 +147,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = os.environ.get('LANGUAGE_CODE', 'en-us')
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = os.environ.get('TIME_ZONE', 'UTC')
 
 USE_I18N = True
 
@@ -159,15 +174,16 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS Settings
-CORS_ALLOWED_ORIGINS = os.environ.get(
-    'CORS_ALLOWED_ORIGINS',
-    'http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173'
-).split(',')
-
-# Allow all origins in development, restrict in production
 if DEBUG:
+    # Allow all origins in development
     CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOW_CREDENTIALS = True
 else:
+    # Restrict to specific origins in production
+    CORS_ALLOWED_ORIGINS = os.environ.get(
+        'CORS_ALLOWED_ORIGINS',
+        'http://localhost:5173'
+    ).split(',')
     CORS_ALLOW_CREDENTIALS = True
 
 # REST Framework Settings
@@ -179,7 +195,7 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 10,
+    'PAGE_SIZE': int(os.environ.get('API_PAGE_SIZE', '10')),
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.SearchFilter',
@@ -189,11 +205,11 @@ REST_FRAMEWORK = {
 
 # JWT Settings
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
-    'AUTH_HEADER_TYPES': ('Bearer',),
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=int(os.environ.get('JWT_ACCESS_TOKEN_LIFETIME_HOURS', '1'))),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=int(os.environ.get('JWT_REFRESH_TOKEN_LIFETIME_DAYS', '7'))),
+    'ROTATE_REFRESH_TOKENS': os.environ.get('JWT_ROTATE_REFRESH_TOKENS', 'True') == 'True',
+    'BLACKLIST_AFTER_ROTATION': os.environ.get('JWT_BLACKLIST_AFTER_ROTATION', 'True') == 'True',
+    'AUTH_HEADER_TYPES': tuple(os.environ.get('JWT_AUTH_HEADER_TYPES', 'Bearer').split(',')),
 }
 
 # Email Settings
