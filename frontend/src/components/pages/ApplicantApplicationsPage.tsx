@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
@@ -9,67 +9,70 @@ import {
   CheckCircle, 
   XCircle,
   Search,
-  Filter
+  Loader2
 } from 'lucide-react';
+import { applicantAPI } from '../../services/api';
 
-const mockApplications = [
-  {
-    id: 1,
-    position: 'Software Engineer',
-    department: 'Engineering',
-    appliedDate: '2025-11-15',
-    status: 'under-review',
-    lastUpdate: '2025-11-28',
-  },
-  {
-    id: 2,
-    position: 'Senior Developer',
-    department: 'Engineering',
-    appliedDate: '2025-10-20',
-    status: 'interview-scheduled',
-    lastUpdate: '2025-11-20',
-    interviewDate: '2025-12-05',
-  },
-  {
-    id: 3,
-    position: 'Product Manager',
-    department: 'Product',
-    appliedDate: '2025-09-10',
-    status: 'rejected',
-    lastUpdate: '2025-10-01',
-  },
-];
+interface Application {
+  id: number;
+  position: string;
+  department: string;
+  applied_date: string;
+  status: string;
+  last_updated?: string;
+  interview_date?: string;
+}
 
 export function ApplicantApplicationsPage() {
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+
+  useEffect(() => {
+    const fetchApplications = async () => {
+      try {
+        setLoading(true);
+        const res = await applicantAPI.getApplications();
+        if (res.success) {
+          setApplications(res.results || res.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching applications:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchApplications();
+  }, []);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'under-review':
         return (
-          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+          <Badge className="bg-yellow-100 text-yellow-800">
             <Clock className="w-3 h-3 mr-1" />
             Under Review
           </Badge>
         );
       case 'interview-scheduled':
         return (
-          <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+          <Badge className="bg-blue-100 text-blue-800">
             <Calendar className="w-3 h-3 mr-1" />
             Interview Scheduled
           </Badge>
         );
       case 'rejected':
         return (
-          <Badge className="bg-red-100 text-red-800 hover:bg-red-100">
+          <Badge className="bg-red-100 text-red-800">
             <XCircle className="w-3 h-3 mr-1" />
             Rejected
           </Badge>
         );
       case 'accepted':
         return (
-          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+          <Badge className="bg-green-100 text-green-800">
             <CheckCircle className="w-3 h-3 mr-1" />
             Accepted
           </Badge>
@@ -79,7 +82,7 @@ export function ApplicantApplicationsPage() {
     }
   };
 
-  const filteredApplications = mockApplications.filter(app => {
+  const filteredApplications = applications.filter(app => {
     const matchesSearch = 
       app.position.toLowerCase().includes(searchTerm.toLowerCase()) ||
       app.department.toLowerCase().includes(searchTerm.toLowerCase());
@@ -87,15 +90,30 @@ export function ApplicantApplicationsPage() {
     return matchesSearch && matchesStatus;
   });
 
+  const stats = {
+    total: applications.length,
+    pending: applications.filter(a => a.status === 'under-review').length,
+    interviews: applications.filter(a => a.status === 'interview-scheduled').length,
+    rejected: applications.filter(a => a.status === 'rejected').length,
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-gray-600" />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-indigo-900 mb-2">My Applications</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">My Applications</h1>
         <p className="text-gray-600">Track and manage all your job applications</p>
       </div>
 
       {/* Filters */}
-      <Card className="shadow-lg border-0 mb-6">
+      <Card className="mb-6">
         <CardHeader>
           <CardTitle>Filter Applications</CardTitle>
         </CardHeader>
@@ -127,16 +145,16 @@ export function ApplicantApplicationsPage() {
       </Card>
 
       {/* Applications List */}
-      <div className="space-y-4">
+      <div className="space-y-4 mb-6">
         {filteredApplications.length === 0 ? (
-          <Card className="shadow-lg border-0">
+          <Card>
             <CardContent className="pt-6 text-center py-12">
               <p className="text-gray-600">No applications found</p>
             </CardContent>
           </Card>
         ) : (
           filteredApplications.map((application) => (
-            <Card key={application.id} className="shadow-lg border-0 border-l-4 border-l-indigo-600">
+            <Card key={application.id} className="border-l-4 border-l-blue-600">
               <CardContent className="pt-6">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex-1">
@@ -147,20 +165,22 @@ export function ApplicantApplicationsPage() {
                       </div>
                       {getStatusBadge(application.status)}
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-gray-700">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-700">
                       <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-indigo-600" />
-                        <span>Applied: {application.appliedDate}</span>
+                        <Calendar className="w-4 h-4 text-gray-500" />
+                        <span>Applied: {new Date(application.applied_date).toLocaleDateString()}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-indigo-600" />
-                        <span>Updated: {application.lastUpdate}</span>
-                      </div>
+                      {application.last_updated && (
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-gray-500" />
+                          <span>Updated: {new Date(application.last_updated).toLocaleDateString()}</span>
+                        </div>
+                      )}
                     </div>
-                    {application.interviewDate && (
-                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                        <p className="text-blue-900">
-                          <strong>Interview scheduled:</strong> {application.interviewDate}
+                    {application.interview_date && (
+                      <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <p className="text-sm text-blue-900">
+                          <strong>Interview scheduled:</strong> {new Date(application.interview_date).toLocaleString()}
                         </p>
                       </div>
                     )}
@@ -173,33 +193,27 @@ export function ApplicantApplicationsPage() {
       </div>
 
       {/* Summary */}
-      <Card className="shadow-lg border-0 mt-6">
+      <Card>
         <CardHeader>
           <CardTitle>Summary</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <p className="text-gray-600 mb-1">Total</p>
-              <h3 className="text-gray-900">{mockApplications.length}</h3>
+              <p className="text-sm text-gray-600 mb-1">Total</p>
+              <h3 className="text-lg font-semibold text-gray-900">{stats.total}</h3>
             </div>
             <div className="text-center p-4 bg-yellow-50 rounded-lg">
-              <p className="text-gray-600 mb-1">Pending</p>
-              <h3 className="text-yellow-900">
-                {mockApplications.filter(a => a.status === 'under-review').length}
-              </h3>
+              <p className="text-sm text-gray-600 mb-1">Pending</p>
+              <h3 className="text-lg font-semibold text-yellow-900">{stats.pending}</h3>
             </div>
             <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <p className="text-gray-600 mb-1">Interviews</p>
-              <h3 className="text-blue-900">
-                {mockApplications.filter(a => a.status === 'interview-scheduled').length}
-              </h3>
+              <p className="text-sm text-gray-600 mb-1">Interviews</p>
+              <h3 className="text-lg font-semibold text-blue-900">{stats.interviews}</h3>
             </div>
             <div className="text-center p-4 bg-red-50 rounded-lg">
-              <p className="text-gray-600 mb-1">Rejected</p>
-              <h3 className="text-red-900">
-                {mockApplications.filter(a => a.status === 'rejected').length}
-              </h3>
+              <p className="text-sm text-gray-600 mb-1">Rejected</p>
+              <h3 className="text-lg font-semibold text-red-900">{stats.rejected}</h3>
             </div>
           </div>
         </CardContent>

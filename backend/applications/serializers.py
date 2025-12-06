@@ -77,16 +77,26 @@ class PositionSerializer(serializers.ModelSerializer):
 class ActivitySerializer(serializers.ModelSerializer):
     applicant_name = serializers.SerializerMethodField()
     changed_by_name = serializers.SerializerMethodField()
+    applicant_data = serializers.SerializerMethodField()
 
     class Meta:
         model = Activity
-        fields = ['id', 'action', 'description', 'applicant', 'applicant_name',
+        fields = ['id', 'action', 'description', 'applicant', 'applicant_name', 'applicant_data',
                   'application', 'changed_by', 'changed_by_name', 'timestamp',
                   'metadata']
 
     def get_applicant_name(self, obj):
         if obj.applicant:
             return obj.applicant.full_name
+        return None
+
+    def get_applicant_data(self, obj):
+        if obj.applicant:
+            return {
+                'first_name': obj.applicant.first_name,
+                'last_name': obj.applicant.last_name,
+                'email': obj.applicant.email
+            }
         return None
 
     def get_changed_by_name(self, obj):

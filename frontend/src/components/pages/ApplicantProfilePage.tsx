@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -13,25 +13,60 @@ import {
   Briefcase,
   Edit,
   Save,
-  X
+  X,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { userAPI } from '../../services/api';
 
-const mockProfile = {
-  firstName: 'John',
-  lastName: 'Doe',
-  email: 'john.doe@example.com',
-  phone: '+1 (555) 123-4567',
-  location: 'San Francisco, CA',
-  education: "Bachelor's Degree in Computer Science",
-  experience: '5 years',
-  skills: 'React, TypeScript, Node.js, Python, Django',
-  linkedIn: 'linkedin.com/in/johndoe',
-};
+interface Profile {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  address?: string;
+  education?: string;
+  skills?: string;
+  linkedin_url?: string;
+  portfolio_url?: string;
+  bio?: string;
+}
 
 export function ApplicantProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState(mockProfile);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState<Profile>({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    address: '',
+    education: '',
+    skills: '',
+    linkedin_url: '',
+    portfolio_url: '',
+    bio: '',
+  });
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        setLoading(true);
+        const res = await userAPI.getProfile();
+        if (res.success) {
+          setFormData(res.data);
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+        toast.error('Failed to load profile');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -42,42 +77,66 @@ export function ApplicantProfilePage() {
     });
   };
 
-  const handleSave = () => {
-    // Mock save - in production, this will call Django API
-    toast.success('Profile updated successfully!');
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      const res = await userAPI.updateProfile(formData);
+      if (res.success) {
+        toast.success('Profile updated successfully!');
+        setIsEditing(false);
+      }
+    } catch (error) {
+      toast.error('Failed to update profile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    try {
+      const res = await userAPI.getProfile();
+      if (res.success) {
+        setFormData(res.data);
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    }
     setIsEditing(false);
   };
 
-  const handleCancel = () => {
-    setFormData(mockProfile);
-    setIsEditing(false);
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-gray-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-indigo-900 mb-2">My Profile</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">My Profile</h1>
         <p className="text-gray-600">Manage your personal and professional information</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Profile Card */}
-        <Card className="shadow-lg border-0 h-fit">
+        <Card className="h-fit">
           <CardContent className="pt-6">
             <div className="text-center">
               <Avatar className="w-24 h-24 mx-auto mb-4">
-                <AvatarFallback className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white text-2xl">
-                  {formData.firstName[0]}{formData.lastName[0]}
+                <AvatarFallback className="bg-gray-200 text-gray-700 text-2xl">
+                  {formData.first_name[0]}{formData.last_name[0]}
                 </AvatarFallback>
               </Avatar>
               <h3 className="text-gray-900 mb-1">
-                {formData.firstName} {formData.lastName}
+                {formData.first_name} {formData.last_name}
               </h3>
               <p className="text-gray-600 mb-4">{formData.email}</p>
               
               {!isEditing ? (
                 <Button 
-                  className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+                  className="w-full"
                   onClick={() => setIsEditing(true)}
                 >
                   <Edit className="w-4 h-4 mr-2" />
@@ -86,16 +145,18 @@ export function ApplicantProfilePage() {
               ) : (
                 <div className="space-y-2">
                   <Button 
-                    className="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"
+                    className="w-full"
                     onClick={handleSave}
+                    disabled={saving}
                   >
                     <Save className="w-4 h-4 mr-2" />
-                    Save Changes
+                    {saving ? 'Saving...' : 'Save Changes'}
                   </Button>
                   <Button 
                     variant="outline"
                     className="w-full"
                     onClick={handleCancel}
+                    disabled={saving}
                   >
                     <X className="w-4 h-4 mr-2" />
                     Cancel
@@ -105,18 +166,16 @@ export function ApplicantProfilePage() {
             </div>
 
             <div className="mt-6 space-y-3">
-              <div className="flex items-center gap-3 text-gray-700">
-                <Phone className="w-4 h-4 text-indigo-600" />
+              <div className="flex items-center gap-3 text-sm text-gray-700">
+                <Phone className="w-4 h-4 text-gray-500" />
                 <span>{formData.phone}</span>
               </div>
-              <div className="flex items-center gap-3 text-gray-700">
-                <MapPin className="w-4 h-4 text-indigo-600" />
-                <span>{formData.location}</span>
-              </div>
-              <div className="flex items-center gap-3 text-gray-700">
-                <Briefcase className="w-4 h-4 text-indigo-600" />
-                <span>{formData.experience} experience</span>
-              </div>
+              {formData.address && (
+                <div className="flex items-center gap-3 text-sm text-gray-700">
+                  <MapPin className="w-4 h-4 text-gray-500" />
+                  <span>{formData.address}</span>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -124,54 +183,44 @@ export function ApplicantProfilePage() {
         {/* Profile Details */}
         <div className="lg:col-span-2 space-y-6">
           {/* Personal Information */}
-          <Card className="shadow-lg border-0">
-            <CardHeader className="bg-gradient-to-r from-indigo-50 to-purple-50">
+          <Card>
+            <CardHeader>
               <CardTitle>Personal Information</CardTitle>
               <CardDescription>Your basic contact details</CardDescription>
             </CardHeader>
             <CardContent className="pt-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
+                  <Label htmlFor="first_name">First Name</Label>
                   {isEditing ? (
                     <Input
-                      id="firstName"
-                      name="firstName"
-                      value={formData.firstName}
+                      id="first_name"
+                      name="first_name"
+                      value={formData.first_name}
                       onChange={handleChange}
                     />
                   ) : (
-                    <p className="text-gray-900 py-2">{formData.firstName}</p>
+                    <p className="text-gray-900 py-2">{formData.first_name}</p>
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
+                  <Label htmlFor="last_name">Last Name</Label>
                   {isEditing ? (
                     <Input
-                      id="lastName"
-                      name="lastName"
-                      value={formData.lastName}
+                      id="last_name"
+                      name="last_name"
+                      value={formData.last_name}
                       onChange={handleChange}
                     />
                   ) : (
-                    <p className="text-gray-900 py-2">{formData.lastName}</p>
+                    <p className="text-gray-900 py-2">{formData.last_name}</p>
                   )}
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
-                {isEditing ? (
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                  />
-                ) : (
-                  <p className="text-gray-900 py-2">{formData.email}</p>
-                )}
+                <p className="text-gray-900 py-2">{formData.email}</p>
               </div>
 
               <div className="space-y-2">
@@ -189,24 +238,24 @@ export function ApplicantProfilePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="location">Location</Label>
+                <Label htmlFor="address">Address</Label>
                 {isEditing ? (
                   <Input
-                    id="location"
-                    name="location"
-                    value={formData.location}
+                    id="address"
+                    name="address"
+                    value={formData.address || ''}
                     onChange={handleChange}
                   />
                 ) : (
-                  <p className="text-gray-900 py-2">{formData.location}</p>
+                  <p className="text-gray-900 py-2">{formData.address || 'Not provided'}</p>
                 )}
               </div>
             </CardContent>
           </Card>
 
           {/* Professional Information */}
-          <Card className="shadow-lg border-0">
-            <CardHeader className="bg-gradient-to-r from-indigo-50 to-purple-50">
+          <Card>
+            <CardHeader>
               <CardTitle>Professional Information</CardTitle>
               <CardDescription>Your work experience and expertise</CardDescription>
             </CardHeader>
@@ -217,25 +266,11 @@ export function ApplicantProfilePage() {
                   <Input
                     id="education"
                     name="education"
-                    value={formData.education}
+                    value={formData.education || ''}
                     onChange={handleChange}
                   />
                 ) : (
-                  <p className="text-gray-900 py-2">{formData.education}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="experience">Years of Experience</Label>
-                {isEditing ? (
-                  <Input
-                    id="experience"
-                    name="experience"
-                    value={formData.experience}
-                    onChange={handleChange}
-                  />
-                ) : (
-                  <p className="text-gray-900 py-2">{formData.experience}</p>
+                  <p className="text-gray-900 py-2">{formData.education || 'Not provided'}</p>
                 )}
               </div>
 
@@ -245,26 +280,55 @@ export function ApplicantProfilePage() {
                   <Textarea
                     id="skills"
                     name="skills"
-                    value={formData.skills}
+                    value={formData.skills || ''}
                     onChange={handleChange}
                     rows={3}
                   />
                 ) : (
-                  <p className="text-gray-900 py-2">{formData.skills}</p>
+                  <p className="text-gray-900 py-2">{formData.skills || 'Not provided'}</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="linkedIn">LinkedIn Profile</Label>
+                <Label htmlFor="linkedin_url">LinkedIn Profile</Label>
                 {isEditing ? (
                   <Input
-                    id="linkedIn"
-                    name="linkedIn"
-                    value={formData.linkedIn}
+                    id="linkedin_url"
+                    name="linkedin_url"
+                    value={formData.linkedin_url || ''}
                     onChange={handleChange}
                   />
                 ) : (
-                  <p className="text-indigo-600 py-2">{formData.linkedIn}</p>
+                  <p className="text-blue-600 py-2">{formData.linkedin_url || 'Not provided'}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="portfolio_url">Portfolio URL</Label>
+                {isEditing ? (
+                  <Input
+                    id="portfolio_url"
+                    name="portfolio_url"
+                    value={formData.portfolio_url || ''}
+                    onChange={handleChange}
+                  />
+                ) : (
+                  <p className="text-blue-600 py-2">{formData.portfolio_url || 'Not provided'}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="bio">Bio</Label>
+                {isEditing ? (
+                  <Textarea
+                    id="bio"
+                    name="bio"
+                    value={formData.bio || ''}
+                    onChange={handleChange}
+                    rows={4}
+                  />
+                ) : (
+                  <p className="text-gray-900 py-2">{formData.bio || 'Not provided'}</p>
                 )}
               </div>
             </CardContent>
@@ -274,3 +338,4 @@ export function ApplicantProfilePage() {
     </div>
   );
 }
+
