@@ -40,6 +40,19 @@ class ApplicationCreateSerializer(serializers.ModelSerializer):
                   'availability', 'education', 'university', 'graduation_year',
                   'skills', 'linkedin_url', 'portfolio_url', 'cover_letter',
                   'referral', 'resume']
+    
+    def validate(self, data):
+        # Convert empty strings to None for optional fields
+        optional_fields = ['current_company', 'current_salary', 'expected_salary', 
+                          'notice_period', 'availability', 'education', 'university',
+                          'graduation_year', 'skills', 'linkedin_url', 'portfolio_url',
+                          'cover_letter', 'referral']
+        
+        for field in optional_fields:
+            if field in data and data[field] == '':
+                data[field] = None
+        
+        return data
 
 
 class StatusHistorySerializer(serializers.ModelSerializer):

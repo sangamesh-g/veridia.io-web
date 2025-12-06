@@ -1,26 +1,32 @@
+# Production Docker Compose Configuration
+# Usage: docker-compose -f docker-compose.prod.yml up -d
+
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: veridia-backend
+    container_name: veridia-backend-prod
     working_dir: /code
     volumes:
-      - ./backend:/code
       - backend_static:/code/staticfiles
       - backend_media:/code/media
-    command: python manage.py runserver 0.0.0.0:8000
+    command: >
+      sh -c "python manage.py collectstatic --noinput &&
+             python manage.py migrate &&
+             gunicorn veridia.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120"
     ports:
       - "8000:8000"
     env_file:
       - ./backend/.env
     environment:
-      - DEBUG=${DEBUG:-True}
-      - DATABASE_URL=${DATABASE_URL:-postgresql://veridia:veridia123@db:5432/veridia}
+      - DEBUG=False
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - veridia-network
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "manage.py", "check", "--database", "default"]
       interval: 30s
@@ -30,37 +36,33 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
-    container_name: veridia-frontend
+      dockerfile: Dockerfile.prod
+    container_name: veridia-frontend-prod
     working_dir: /app
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    command: npm run dev -- --host 0.0.0.0
+      - frontend_dist:/app/dist
     ports:
-      - "5173:5173"
+      - "80:80"
     env_file:
       - ./frontend/.env
-    environment:
-      - VITE_API_URL=${VITE_API_URL:-http://localhost:8000/api/v1}
     depends_on:
       - backend
     networks:
       - veridia-network
+    restart: unless-stopped
 
   db:
     image: postgres:15-alpine
-    container_name: veridia-db
+    container_name: veridia-db-prod
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-veridia}
       - POSTGRES_USER=${POSTGRES_USER:-veridia}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-veridia123}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     networks:
       - veridia-network
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-veridia}"]
       interval: 10s
@@ -71,7 +73,9 @@ volumes:
   postgres_data:
   backend_static:
   backend_media:
+  frontend_dist:
 
 networks:
   veridia-network:
     driver: bridge
+

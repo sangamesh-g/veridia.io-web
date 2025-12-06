@@ -38,27 +38,65 @@ class ApplicationViewSet(viewsets.ModelViewSet):
             return ApplicationCreateSerializer
         return ApplicationSerializer
 
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        return Response({
+            'success': True,
+            'results': response.data.get('results', response.data),
+            'count': response.data.get('count', len(response.data.get('results', []))),
+            'next': response.data.get('next'),
+            'previous': response.data.get('previous'),
+        })
+
+    def retrieve(self, request, *args, **kwargs):
+        response = super().retrieve(request, *args, **kwargs)
+        return Response({
+            'success': True,
+            'data': response.data
+        })
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            application = serializer.save(applicant=request.user)
+            # Create status history
+            StatusHistory.objects.create(
+                application=application,
+                status=application.status,
+                changed_by=None,
+                comment="Application submitted"
+            )
+            # Create activity
+            Activity.objects.create(
+                action='application_submitted',
+                description=f'New application received for {application.position}',
+                applicant=request.user,
+                application=application
+            )
+            # Send emails
+            try:
+                send_application_confirmation(application.id)
+            except:
+                pass
+            
+            return Response({
+                'success': True,
+                'message': 'Application submitted successfully',
+                'data': ApplicationSerializer(application, context={'request': request}).data
+            }, status=status.HTTP_201_CREATED)
+        
+        return Response({
+            'success': False,
+            'error': {
+                'code': 'VALIDATION_ERROR',
+                'message': 'Invalid input data',
+                'details': serializer.errors
+            }
+        }, status=status.HTTP_400_BAD_REQUEST)
+
     def perform_create(self, serializer):
-        application = serializer.save(applicant=self.request.user)
-        # Create status history
-        StatusHistory.objects.create(
-            application=application,
-            status=application.status,
-            changed_by=None,
-            comment="Application submitted"
-        )
-        # Create activity
-        Activity.objects.create(
-            action='application_submitted',
-            description=f'New application received for {application.position}',
-            applicant=self.request.user,
-            application=application
-        )
-        # Send emails
-        try:
-            send_application_confirmation(application.id)
-        except:
-            pass
+        # This is now handled in create() method above
+        pass
 
     def perform_update(self, serializer):
         old_status = self.get_object().status
