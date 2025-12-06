@@ -1,0 +1,7 @@
+email,first_name,last_name,phone,user_type,is_verified
+john.doe@example.com,John,Doe,555-0101,applicant,True
+jane.smith@example.com,Jane,Smith,555-0102,applicant,True
+mike.johnson@example.com,Mike,Johnson,555-0103,applicant,True
+sarah.williams@example.com,Sarah,Williams,555-0104,applicant,True
+tom.brown@example.com,Tom,Brown,555-0105,applicant,True
+

@@ -1,0 +1,6 @@
+applicant_email,position,department,status,experience,expected_salary,skills,education,interview_date
+john.doe@example.com,Software Engineer,Engineering,under-review,5 years,$90,000,"React, TypeScript, Node.js, Python","Bachelor's Degree",
+jane.smith@example.com,Senior Developer,Engineering,interview-scheduled,8 years,$120,000,"Java, Spring Boot, AWS, Docker","Master's Degree",5
+mike.johnson@example.com,UI/UX Designer,Design,under-review,4 years,$75,000,"Figma, Adobe XD, Sketch, Prototyping","Bachelor's Degree",
+sarah.williams@example.com,Product Manager,Product,accepted,6 years,$110,000,"Agile, Product Strategy, Analytics","Master's Degree",
+tom.brown@example.com,Data Analyst,Engineering,rejected,3 years,$70,000,"SQL, Python, Tableau, Statistics","Bachelor's Degree",
