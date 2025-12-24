@@ -46,6 +46,8 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
     'django_filters',
+    'drf_spectacular',  # OpenAPI schema + interactive docs
+    # 'rest_framework.authtoken',  # Optional: enable TokenAuthentication (installed here)
     
     # Local apps
     'users',
@@ -188,19 +190,54 @@ else:
 
 # REST Framework Settings
 REST_FRAMEWORK = {
+    # Authentication backends (installed where noted):
+    # - JWT (active): requires 'rest_framework_simplejwt' in INSTALLED_APPS (installed above)
+    # - SessionAuthentication (optional): for browsable API/admin; no extra install
+    # - TokenAuthentication (optional): requires 'rest_framework.authtoken' in INSTALLED_APPS (commented above)
+    # - BasicAuthentication (optional): no extra install
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',  # Active
+        # 'rest_framework.authentication.SessionAuthentication',       # Optional
+        # 'rest_framework.authentication.TokenAuthentication',         # Optional (install app)
+        # 'rest_framework.authentication.BasicAuthentication',         # Optional
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': int(os.environ.get('API_PAGE_SIZE', '10')),
+    # Pagination: using custom PageNumberPagination with page_size_query_param support
+    'DEFAULT_PAGINATION_CLASS': 'core.pagination.DefaultPageNumberPagination',
+    'PAGE_SIZE': int(os.environ.get('API_PAGE_SIZE', '20')),
+    # Filtering, search, ordering
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ],
+    # Throttling (ensure cache backend configured in production; e.g., Redis)
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.ScopedRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'user': os.environ.get('DRF_THROTTLE_USER', '1000/day'),
+        'anon': os.environ.get('DRF_THROTTLE_ANON', '100/day'),
+        # Scoped example (used by core.throttles.UploadsBurstThrottle):
+        'uploads': os.environ.get('DRF_THROTTLE_UPLOADS', '10/min'),
+    },
+    # Schema generation (OpenAPI) via drf-spectacular
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    # Exception handling: wrap responses in consistent error envelope
+    'EXCEPTION_HANDLER': 'core.exceptions.custom_exception_handler',
+}
+
+# drf-spectacular settings (interactive docs served in urls.py)
+SPECTACULAR_SETTINGS = {
+    'TITLE': os.environ.get('API_TITLE', 'Veridia API'),
+    'DESCRIPTION': os.environ.get('API_DESCRIPTION', 'Production-ready DRF configuration with JWT, filters, throttles, and schema.'),
+    'VERSION': os.environ.get('API_VERSION', '1.0.0'),
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
 }
 
 # JWT Settings
